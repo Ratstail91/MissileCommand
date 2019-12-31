@@ -2,6 +2,9 @@
 
 #include <SDL2/SDL.h>
 
+#include <chrono>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 
 int SDL_main(int argc, char* argv[]) {
@@ -36,11 +39,15 @@ int SDL_main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	//seed the random number generator
+	srand(time(NULL));
+
 	//the scene to use
 	MissileScene* scene = new MissileScene(renderer);
 
 	//game loop
 	bool running = true;
+	std::chrono::steady_clock::time_point time = std::chrono::steady_clock::now();
 
 	while(running) {
 		//event loop
@@ -56,6 +63,12 @@ int SDL_main(int argc, char* argv[]) {
 					scene->HandleEvent(&event);
 					break;
 			}
+		}
+
+		//steady update (~63 FPS)
+		if (std::chrono::steady_clock::now() - time > std::chrono::duration<long long, std::milli>(16)) {
+			scene->Update();
+			time = std::chrono::steady_clock::now();
 		}
 
 		//render event
