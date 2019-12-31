@@ -1,3 +1,5 @@
+#include "missile_scene.hpp"
+
 #include <SDL2/SDL.h>
 
 #include <iostream>
@@ -34,6 +36,9 @@ int SDL_main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	//the scene to use
+	MissileScene* scene = new MissileScene(renderer);
+
 	//game loop
 	bool running = true;
 
@@ -47,11 +52,17 @@ int SDL_main(int argc, char* argv[]) {
 					break;
 
 				//input, etc.
+				default:
+					scene->HandleEvent(&event);
+					break;
 			}
 		}
 
 		//render event
 		SDL_RenderClear(renderer);
+
+		scene->Render(renderer);
+
 		SDL_RenderPresent(renderer);
 
 		//give the machine a break
@@ -59,6 +70,8 @@ int SDL_main(int argc, char* argv[]) {
 	}
 
 	//cleanup
+	delete scene;
+
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
