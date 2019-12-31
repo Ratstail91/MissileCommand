@@ -66,7 +66,7 @@ int SDL_main(int argc, char* argv[]) {
 		}
 
 		//steady update (~63 FPS)
-		if (std::chrono::steady_clock::now() - time > std::chrono::duration<long long, std::milli>(16)) {
+		if (std::chrono::steady_clock::now() - time > std::chrono::duration<int, std::milli>(16)) {
 			scene->Update();
 			time = std::chrono::steady_clock::now();
 		}

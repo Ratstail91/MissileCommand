@@ -4,6 +4,7 @@
 
 #include <SDL2/SDL.h>
 
+#include <chrono>
 #include <vector>
 
 class MissileScene {
@@ -18,6 +19,8 @@ public:
 private:
 	Sprite* background = NULL;
 	Sprite* dot = NULL;
+	Sprite* city = NULL;
+	Sprite* player = NULL;
 
 	struct Bullet {
 		int x, y;
@@ -26,6 +29,12 @@ private:
 	};
 
 	std::vector<Bullet> bullets;
+	bool cities[5];
+	std::chrono::steady_clock::time_point bulletTimer = std::chrono::steady_clock::now();
+	int playerX = 390;
+	int playerVelocity = 0;
 
 	void CreateRandomBullet();
 };
+
+//TODO: cascading explosions
