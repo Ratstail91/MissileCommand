@@ -90,6 +90,11 @@ void MissileScene::Update() {
 			return true;
 		}
 
+		//"collide" with the ceiling
+		if (b.y < -10) {
+			return true;
+		}
+
 		//"collide" with other bullets
 		auto other = std::find_if(bullets.begin(), bullets.end(), [&](Bullet c) {
 			if (b.x == c.x && b.y == c.y) {
