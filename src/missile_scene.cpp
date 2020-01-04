@@ -1,6 +1,7 @@
 #include "missile_scene.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 //utility functions
@@ -10,11 +11,19 @@ inline int clamp(int v, int lo, int hi) {
 	return v;
 }
 
+inline float distance(int x1, int y1, int x2, int y2) {
+	// Calculating distance 
+	return sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2) * 1.0); 
+} 
+
 MissileScene::MissileScene(SDL_Renderer* renderer) {
 	background = LoadSprite(renderer, "rsc/background.bmp", {0, 0, 800, 600}, {0, 0, 800, 600});
 	dot = LoadSprite(renderer, "rsc/dot.bmp", {0, 0, 8, 8}, {0, 0, 8, 8});
 	city = LoadSprite(renderer, "rsc/city.bmp", {0, 0, 160, 50}, {0, 0, 160, 50});
 	player = LoadSprite(renderer, "rsc/player.bmp", {0, 0, 20, 20}, {0, 0, 20, 20});
+	explosion1 = LoadSprite(renderer, "rsc/explosion1.bmp", {0, 0, 64, 64}, {0, 0, 64, 64});
+	explosion2 = LoadSprite(renderer, "rsc/explosion2.bmp", {0, 0, 64, 64}, {0, 0, 64, 64});
+	gameOver = LoadSprite(renderer, "rsc/gameover.bmp", {0, 0, 800, 600}, {0, 0, 800, 600});
 
 	for(int i = 0; i < 5; i++) {
 		cities[i] = true;
@@ -26,6 +35,9 @@ MissileScene::~MissileScene() {
 	UnloadSprite(dot);
 	UnloadSprite(city);
 	UnloadSprite(player);
+	UnloadSprite(explosion1);
+	UnloadSprite(explosion2);
+	UnloadSprite(gameOver);
 }
 
 void MissileScene::HandleEvent(SDL_Event* event) {
@@ -52,6 +64,10 @@ void MissileScene::HandleEvent(SDL_Event* event) {
 }
 
 void MissileScene::Update() {
+	if (IsGameOver()) {
+		return;
+	}
+
 	//create a new bullet every second
 	if (std::chrono::steady_clock::now() - bulletTimer > std::chrono::duration<int, std::milli>(1000)) {
 		CreateRandomBullet();
@@ -80,13 +96,18 @@ void MissileScene::Update() {
 
 		//"collide" with the player
 		if (b.y >= 460 && b.x > playerX && b.x < playerX + 20) { //TODO: fix magic numbers
-			//TODO: end the game
+			CreateExplosion(b.x, b.y);
+
+			//end the game
+			playerAlive = false;
+
 			return true;
 		}
 
 		//"collide" with the ground or a city
 		if (b.y >= 500) {
 			cities[b.x / 160] = false;
+			CreateExplosion(b.x, b.y);
 			return true;
 		}
 
@@ -109,16 +130,58 @@ void MissileScene::Update() {
 		});
 
 		if (other != bullets.end()) {
+			CreateExplosion(b.x, b.y);
+			return true;
+		}
+
+		//"collide" with explosions
+		auto expl = std::find_if(explosions.begin(), explosions.end(), [&](Explosion e) {
+			return distance(b.x, b.y, e.x, e.y) < 32;
+		});
+
+		if (expl != explosions.end()) {
+			CreateExplosion(b.x, b.y);
 			return true;
 		}
 
 		return false;
 	}), bullets.end());
 
-	//TODO: end the game if no cities remain
+	//prune the explosions that are too old
+	explosions.erase(std::remove_if(explosions.begin(), explosions.end(), [&](Explosion e) {
+		return std::chrono::steady_clock::now() - e.creationTime > std::chrono::duration<int, std::milli>(500);
+	}), explosions.end());
 }
 
 void MissileScene::Render(SDL_Renderer* renderer) {
+	if (IsGameOver()) {
+		gameOver->Render(renderer);
+
+		//render remaining cities
+		for(int i = 0; i < 5; i++) {
+			if (cities[i]) {
+				SDL_Rect rect = {i * 160, 500, 160, 50};
+				city->SetDstRect(rect);
+				city->Render(renderer);
+			}
+		}
+
+		//render remaining explosions
+		std::for_each(explosions.begin(), explosions.end(), [&](Explosion e) {
+			SDL_Rect rect = {e.x - 32, e.y - 32, 64, 64};
+
+			if (rand() % 2) {
+				explosion1->SetDstRect(rect);
+				explosion1->Render(renderer);
+			} else {
+				explosion2->SetDstRect(rect);
+				explosion2->Render(renderer);
+			}
+		});
+
+		return;
+	}
+
 	background->Render(renderer);
 
 	//for each bullet
@@ -131,6 +194,7 @@ void MissileScene::Render(SDL_Renderer* renderer) {
 		});
 	});
 
+	//for each city
 	for(int i = 0; i < 5; i++) {
 		if (cities[i]) {
 			SDL_Rect rect = {i * 160, 500, 160, 50};
@@ -138,6 +202,19 @@ void MissileScene::Render(SDL_Renderer* renderer) {
 			city->Render(renderer);
 		}
 	}
+
+	//for each explosion
+	std::for_each(explosions.begin(), explosions.end(), [&](Explosion e) {
+		SDL_Rect rect = {e.x - 32, e.y - 32, 64, 64};
+
+		if (rand() % 2) {
+			explosion1->SetDstRect(rect);
+			explosion1->Render(renderer);
+		} else {
+			explosion2->SetDstRect(rect);
+			explosion2->Render(renderer);
+		}
+	});
 
 	player->SetDstRect({playerX, 460, 20, 20});
 	player->Render(renderer);
@@ -152,4 +229,25 @@ void MissileScene::CreateRandomBullet() {
 	bullet.yvel = 4; //difficulty
 
 	bullets.push_back(bullet);
+}
+
+void MissileScene::CreateExplosion(int x, int y) {
+	Explosion e;
+	e.x = x;
+	e.y = y;
+	explosions.push_back(e);
+}
+
+bool MissileScene::IsGameOver() {
+	if (!playerAlive) {
+		return true;
+	}
+
+	for(int i = 0; i < 5; i++) {
+		if (cities[i]) {
+			return false;
+		}
+	}
+
+	return true;
 }

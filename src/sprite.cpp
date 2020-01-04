@@ -39,6 +39,10 @@ Sprite* LoadSprite(SDL_Renderer* renderer, std::string fname, SDL_Rect src, SDL_
 		return NULL;
 	}
 
+	//set the colorkey
+	SDL_SetColorKey(surface, SDL_TRUE, SDL_MapRGB(surface->format, 255, 0, 255));
+
+	//create the texture
 	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
 
 	if (!texture) {
